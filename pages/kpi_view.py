@@ -8,6 +8,7 @@ Phase 3: KPI 추진현황 탭
 import streamlit as st
 import pandas as pd
 from pages.llm_briefing import analyze_org_kpis
+from utils.data_loader import filter_active_orgs, get_active_org_ids, get_active_kpi_ids
 
 
 # 평가등급별 색상
@@ -162,8 +163,13 @@ def _render_org_section(org_name: str, org_id: int, level: int,
 
 def render(data: dict[str, pd.DataFrame]):
     """KPI 추진현황 탭 전체 렌더링"""
-    org_df = data["org"]
-    monthly_df = data["monthly"]
+    org_df = filter_active_orgs(data["org"])
+    active_ids = get_active_org_ids(data["org"])
+    active_kpis = get_active_kpi_ids(data["kpi"])
+    monthly_df = data["monthly"][
+        data["monthly"]["조직ID"].isin(active_ids)
+        & data["monthly"]["KPI_ID"].isin(active_kpis)
+    ].copy()
     latest_month = _get_latest_month(monthly_df)
 
     # 1) Level 1: 전사 (조직ID 순)

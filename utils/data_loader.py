@@ -4,6 +4,8 @@ Google Sheets 데이터 로더
 - 시트가 '링크가 있는 모든 사용자에게 공개'로 설정되어 있어야 함
 """
 
+from datetime import date
+
 import pandas as pd
 import urllib.parse
 
@@ -56,3 +58,56 @@ def load_all_data() -> dict[str, pd.DataFrame]:
         data[key] = load_sheet(sheet_name)
     print("데이터 로딩 완료!")
     return data
+
+
+def get_active_org_ids(org_df: pd.DataFrame) -> set[int]:
+    """폐지되지 않은 조직 ID 집합을 반환.
+
+    해지일이 비어있거나(NaN) 해지일이 오늘 이후이면 활성 조직.
+    해지일이 있고 오늘보다 과거이면 폐지된 조직으로 판단하여 제외.
+    """
+    today = date.today()
+    active_ids: set[int] = set()
+    for _, row in org_df.iterrows():
+        end_date = row.get("해지일")
+        # NaN / None / 빈 문자열 → 활성
+        if pd.isna(end_date) or str(end_date).strip() == "":
+            active_ids.add(int(row["조직ID"]))
+            continue
+        # 날짜 파싱 후 비교
+        try:
+            parsed = pd.to_datetime(str(end_date)).date()
+            if parsed >= today:
+                active_ids.add(int(row["조직ID"]))
+        except (ValueError, TypeError):
+            # 파싱 실패 시 안전하게 활성 처리
+            active_ids.add(int(row["조직ID"]))
+    return active_ids
+
+
+def filter_active_orgs(org_df: pd.DataFrame) -> pd.DataFrame:
+    """폐지된 조직을 제외한 Org_Master DataFrame 반환"""
+    active_ids = get_active_org_ids(org_df)
+    return org_df[org_df["조직ID"].astype(int).isin(active_ids)].copy()
+
+
+def get_active_kpi_ids(kpi_df: pd.DataFrame) -> set[str]:
+    """폐지되지 않은 KPI_ID 집합을 반환.
+
+    해지일이 비어있거나(NaN) 해지일이 오늘 이후이면 활성 KPI.
+    해지일이 있고 오늘보다 과거이면 폐지된 KPI로 판단하여 제외.
+    """
+    today = date.today()
+    active_ids: set[str] = set()
+    for _, row in kpi_df.iterrows():
+        end_date = row.get("해지일")
+        if pd.isna(end_date) or str(end_date).strip() == "":
+            active_ids.add(str(row["KPI_ID"]))
+            continue
+        try:
+            parsed = pd.to_datetime(str(end_date)).date()
+            if parsed >= today:
+                active_ids.add(str(row["KPI_ID"]))
+        except (ValueError, TypeError):
+            active_ids.add(str(row["KPI_ID"]))
+    return active_ids

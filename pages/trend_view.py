@@ -7,6 +7,7 @@
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from utils.data_loader import filter_active_orgs, get_active_org_ids, get_active_kpi_ids
 
 # KPI별 색상 팔레트
 _PALETTE = [
@@ -182,38 +183,62 @@ def _make_kpi_fig(kpi_name: str, kpi_data: pd.DataFrame, color: str,
     """KPI 1개의 소형 꺾은선 그래프 생성 (Y축 범위 통일, 영역 색상)"""
     fig = go.Figure()
 
-    # 배경 영역: 100% 이상 → 연한 초록
+    # 배경 영역: 100% 이상 → 아쿠아블루 (연한 청록)
     fig.add_hrect(
         y0=100, y1=y_max,
-        fillcolor="rgba(16,185,129,0.08)", line_width=0,
+        fillcolor="rgba(0,188,212,0.10)", line_width=0,
     )
-    # 배경 영역: 90% 미만 → 연한 빨강
+    # 배경 영역: 100% 미만 → 연한 붉은색
     fig.add_hrect(
-        y0=y_min, y1=90,
+        y0=y_min, y1=100,
         fillcolor="rgba(239,68,68,0.08)", line_width=0,
     )
 
-    line_color = "#0047AB"
+    # 꺾은선 1: YTD 달성률 (진한 파랑)
+    ytd_color = "#0047AB"
     fig.add_trace(go.Scatter(
         x=kpi_data["월"],
         y=kpi_data["달성률"],
         mode="lines+markers+text",
-        line=dict(color=line_color, width=2.5),
-        marker=dict(size=6, color=line_color),
+        line=dict(color=ytd_color, width=2.5),
+        marker=dict(size=6, color=ytd_color),
         text=[f"{v:.1f}" for v in kpi_data["달성률"]],
         textposition="top center",
-        textfont=dict(size=9, color=line_color),
+        textfont=dict(size=9, color=ytd_color),
+        name="YTD 달성률",
         hovertemplate="%{x}월: %{y:.1f}%<extra></extra>",
     ))
+
+    # 꺾은선 2: 월 달성률 (주황색)
+    monthly_color = "#F5A623"
+    monthly_rates = kpi_data["월달성률"].dropna()
+    if not monthly_rates.empty:
+        fig.add_trace(go.Scatter(
+            x=kpi_data.loc[monthly_rates.index, "월"],
+            y=monthly_rates,
+            mode="lines+markers+text",
+            line=dict(color=monthly_color, width=2),
+            marker=dict(size=5, color=monthly_color),
+            text=[f"{v:.1f}" for v in monthly_rates],
+            textposition="bottom center",
+            textfont=dict(size=8, color=monthly_color),
+            name="월 달성률",
+            hovertemplate="%{x}월: %{y:.1f}%<extra></extra>",
+        ))
+
     fig.add_hline(
         y=100, line_dash="dot", line_color="#D1D5DB", line_width=1,
     )
     fig.update_layout(
-        height=180,
-        margin=dict(l=10, r=10, t=28, b=24),
+        height=200,
+        margin=dict(l=10, r=10, t=36, b=24),
         plot_bgcolor="#FAFBFF",
         paper_bgcolor="rgba(0,0,0,0)",
-        showlegend=False,
+        showlegend=True,
+        legend=dict(
+            orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
+            font=dict(size=9), bgcolor="rgba(0,0,0,0)",
+        ),
         title=dict(
             text=kpi_name,
             font=dict(size=13, color="#1E3A8A", family="Noto Sans KR, sans-serif"),
@@ -244,6 +269,7 @@ def _render_org_chart(org_name: str, org_id: int, level: int,
         return
 
     org_data["달성률"] = org_data["YTD달성률"].apply(_parse_rate)
+    org_data["월달성률"] = org_data["월 달성률"].apply(_parse_rate)
     org_data = org_data.dropna(subset=["달성률"])
     if org_data.empty:
         return
@@ -270,9 +296,7 @@ def _render_org_chart(org_name: str, org_id: int, level: int,
         f' background:{bg}; border-radius:10px; color:white; font-weight:900;'
         f' font-size:{font_size}; display:flex; align-items:baseline;'
         f' font-family:\'Noto Sans KR\',sans-serif;">'
-        f'{icon} {org_name}'
-        f'<span style="font-size:12px; font-weight:600; opacity:0.75;'
-        f' margin-left:10px;">(YTD 달성률 %)</span></div>',
+        f'{icon} {org_name}</div>',
         unsafe_allow_html=True,
     )
 
@@ -332,11 +356,18 @@ def _ordered_orgs(org_df: pd.DataFrame) -> list[tuple[str, int, int]]:
 
 def render(data: dict[str, pd.DataFrame]):
     """월별 KPI 추이 탭 렌더링"""
-    org_df = data["org"]
-    monthly_df = data["monthly"]
+    org_df = filter_active_orgs(data["org"])
+    active_ids = get_active_org_ids(data["org"])
+    active_kpis = get_active_kpi_ids(data["kpi"])
+    monthly_df = data["monthly"][
+        data["monthly"]["조직ID"].isin(active_ids)
+        & data["monthly"]["KPI_ID"].isin(active_kpis)
+    ].copy()
 
-    # 전체 데이터에서 Y축 범위 계산 (모든 차트 통일)
-    all_rates = monthly_df["YTD달성률"].apply(_parse_rate).dropna()
+    # 전체 데이터에서 Y축 범위 계산 (YTD + 월 달성률 모두 포함)
+    all_ytd = monthly_df["YTD달성률"].apply(_parse_rate).dropna()
+    all_monthly = monthly_df["월 달성률"].apply(_parse_rate).dropna()
+    all_rates = pd.concat([all_ytd, all_monthly])
     rate_min = all_rates.min()
     rate_max = all_rates.max()
     margin = (rate_max - rate_min) * 0.08

@@ -6,6 +6,7 @@
 
 import pandas as pd
 import streamlit as st
+from utils.data_loader import filter_active_orgs
 
 # Level별 색상 정의
 LEVEL_COLORS = {
@@ -163,7 +164,7 @@ def _render_tree_html(tree: dict) -> str:
 
 def render(data: dict[str, pd.DataFrame]):
     """조직도 탭 렌더링"""
-    org_df = data["org"]
+    org_df = filter_active_orgs(data["org"])
     tree = _build_tree(org_df)
     html = _render_tree_html(tree)
 
