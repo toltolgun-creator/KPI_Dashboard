@@ -5,7 +5,7 @@ KPI Dashboard - 메인 앱
 
 import streamlit as st
 from utils.data_loader import load_all_data
-from pages import kpi_view, org_view, trend_view
+from pages import kpi_view, org_view, trend_view, data_view
 
 # 페이지 설정
 st.set_page_config(
@@ -177,7 +177,7 @@ with st.spinner("데이터 로딩 중..."):
 # ──────────────────────────────────────────
 # 3개 탭
 # ──────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["📋 KPI 추진현황", "📈 월별 KPI 추이", "🏢 조직도"])
+tab1, tab2, tab3, tab4 = st.tabs(["📋 KPI 추진현황", "📈 월별 KPI 추이", "📊 KPI 데이터", "🏢 조직도"])
 
 with tab1:
     kpi_view.render(data)
@@ -186,4 +186,7 @@ with tab2:
     trend_view.render(data)
 
 with tab3:
+    data_view.render(data)
+
+with tab4:
     org_view.render(data)

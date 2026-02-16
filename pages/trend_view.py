@@ -230,7 +230,7 @@ def _make_kpi_fig(kpi_name: str, kpi_data: pd.DataFrame, color: str,
         y=100, line_dash="dot", line_color="#D1D5DB", line_width=1,
     )
     fig.update_layout(
-        height=200,
+        height=280,
         margin=dict(l=10, r=10, t=36, b=24),
         plot_bgcolor="#FAFBFF",
         paper_bgcolor="rgba(0,0,0,0)",
