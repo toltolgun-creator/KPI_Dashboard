@@ -157,3 +157,44 @@ Google Sheets: https://docs.google.com/spreadsheets/d/1gL-Y0LHpJqlDaqJx0TS87LGOI
 ### 프로젝트 완성
 - 전체 Phase 1~7 완료
 - Streamlit Cloud 배포
+
+---
+
+## 향후 작업: LLM API 연동 (AI 성과해석 고도화)
+
+### 현재 상태
+- KPI 추진현황, 월별 추이 탭의 "AI 성과해석" 박스는 **룰 기반 자동 생성** (LLM 미사용)
+- `pages/llm_briefing.py`의 `analyze_org_kpis()` — KPI 추진현황용 분석
+- `pages/trend_view.py`의 `_analyze_trend()` — 월별 추이용 분석
+- 달성률 구간별 고정 멘트를 출력하는 방식 (분석 깊이 제한적)
+
+### 목표
+- 실제 LLM API(Claude API 등)를 연동하여 데이터 기반 심층 분석 제공
+- 고객 배포 시 전문적인 KPI 성과 해석이 가능하도록 개선
+
+### 수정 범위 (작업량: 소)
+현재 코드 구조가 **분석 함수 ↔ 렌더링 함수**로 분리되어 있어 수정이 간단함
+
+| 수정 대상 | 내용 |
+|---|---|
+| `llm_briefing.py` → `analyze_org_kpis()` | 내부 로직을 LLM API 호출로 교체 |
+| `trend_view.py` → `_analyze_trend()` | 내부 로직을 LLM API 호출로 교체 |
+| Streamlit Secrets | API 키 설정 추가 |
+| `requirements.txt` | LLM SDK 추가 (예: `anthropic`) |
+
+**변경 불필요**: 렌더링 코드(`_render_ai_box`, `_render_trend_ai_box`), app.py, data_view.py, org_view.py
+
+### 주의사항: 비용과 속도
+
+| 항목 | 설명 |
+|---|---|
+| API 호출 횟수 | 현재 11개 조직 × 2개 탭 = 페이지 로드당 약 22회 호출 |
+| 비용 | 호출당 과금 발생 (LLM 요금제에 따라 다름) |
+| 속도 | LLM 호출 1건당 2~5초 → 전체 로딩 느려질 수 있음 |
+
+### 비용/속도 최적화 대안
+
+1. **캐싱 강화**: 데이터가 바뀔 때만 LLM 호출 (매 로드마다 호출하지 않음)
+2. **배치 처리**: 전체 조직 데이터를 한 번에 보내서 1회 호출로 처리
+3. **수동 트리거**: "AI 분석 실행" 버튼을 누를 때만 LLM 호출
+4. **하이브리드**: 기본은 룰 기반, 사용자가 원할 때만 LLM 분석 실행
